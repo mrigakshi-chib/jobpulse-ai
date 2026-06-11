@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.job import Job
 from app.schemas.job import JobCreate, JobResponse
+from app.services.scoring import calculate_job_score
 
 
 router = APIRouter(
@@ -24,7 +25,10 @@ def create_job(job: JobCreate, db: Session = Depends(get_db)):
             detail="Job with this URL already exists",
         )
 
-    new_job = Job(**job.model_dump())
+    job_data = job.model_dump()
+    job_data["score"] = calculate_job_score(job_data)
+
+    new_job = Job(**job_data)
 
     db.add(new_job)
     db.commit()
