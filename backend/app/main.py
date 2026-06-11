@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 
+from app.database import Base, engine
+from app.models.job import Job
+
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="JobPulse AI",
     description="AI-assisted job discovery and application tracker for freshers",
@@ -18,4 +23,12 @@ def root():
 def health_check():
     return {
         "status": "ok"
+    }
+
+
+@app.get("/db-health")
+def db_health_check():
+    return {
+        "database": "connected",
+        "table": "jobs"
     }
