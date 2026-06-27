@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -38,8 +39,37 @@ def create_job(job: JobCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[JobResponse])
-def get_jobs(db: Session = Depends(get_db)):
-    jobs = db.query(Job).order_by(Job.created_at.desc()).all()
+def get_jobs(
+    status: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
+    min_score: Optional[int] = Query(default=None, ge=0, le=100),
+    search: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Job)
+
+    if status:
+        query = query.filter(Job.status == status)
+
+    if source:
+        query = query.filter(Job.source == source)
+
+    if min_score is not None:
+        query = query.filter(Job.score >= min_score)
+
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Job.title.ilike(search_pattern),
+                Job.company.ilike(search_pattern),
+                Job.location.ilike(search_pattern),
+                Job.description.ilike(search_pattern),
+            )
+        )
+
+    jobs = query.order_by(Job.created_at.desc()).all()
+
     return jobs
 
 
