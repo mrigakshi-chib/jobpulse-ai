@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.job import Job
-from app.schemas.job import JobCreate, JobResponse
+from app.schemas.job import JobCreate, JobResponse, JobStatusUpdate
 from app.services.scoring import calculate_job_score
 
 
@@ -82,5 +82,27 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
             status_code=404,
             detail="Job not found",
         )
+
+    return job
+
+
+@router.patch("/{job_id}/status", response_model=JobResponse)
+def update_job_status(
+    job_id: int,
+    status_update: JobStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    job.status = status_update.status
+
+    db.commit()
+    db.refresh(job)
 
     return job

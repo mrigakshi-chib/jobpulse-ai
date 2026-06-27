@@ -1,7 +1,18 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
+
+
+JobStatus = Literal[
+    "new",
+    "saved",
+    "applied",
+    "rejected",
+    "not_relevant",
+    "interview",
+    "offer",
+]
 
 
 class JobBase(BaseModel):
@@ -12,12 +23,16 @@ class JobBase(BaseModel):
     job_url: str
     apply_url: Optional[str] = None
     description: Optional[str] = None
-    status: str = "new"
+    status: JobStatus = "new"
     score: int = 0
 
 
 class JobCreate(JobBase):
     pass
+
+
+class JobStatusUpdate(BaseModel):
+    status: JobStatus
 
 
 class JobResponse(JobBase):
