@@ -37,6 +37,7 @@ class JobStatusUpdate(BaseModel):
 
 class JobResponse(JobBase):
     id: int
+    fingerprint: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

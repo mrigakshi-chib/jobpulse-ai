@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.job import Job
 from app.schemas.job import JobCreate, JobResponse, JobStatusUpdate
+from app.services.dedupe import calculate_job_fingerprint
 from app.services.scoring import calculate_job_score
 
 
@@ -18,16 +19,26 @@ router = APIRouter(
 
 @router.post("/", response_model=JobResponse)
 def create_job(job: JobCreate, db: Session = Depends(get_db)):
-    existing_job = db.query(Job).filter(Job.job_url == job.job_url).first()
+    job_data = job.model_dump()
+    job_data["score"] = calculate_job_score(job_data)
+    job_data["fingerprint"] = calculate_job_fingerprint(job_data)
+
+    existing_job = (
+        db.query(Job)
+        .filter(
+            or_(
+                Job.job_url == job_data["job_url"],
+                Job.fingerprint == job_data["fingerprint"],
+            )
+        )
+        .first()
+    )
 
     if existing_job:
         raise HTTPException(
             status_code=400,
-            detail="Job with this URL already exists",
+            detail="Duplicate job already exists",
         )
-
-    job_data = job.model_dump()
-    job_data["score"] = calculate_job_score(job_data)
 
     new_job = Job(**job_data)
 

@@ -17,6 +17,8 @@ class Job(Base):
     job_url = Column(Text, nullable=False, unique=True)
     apply_url = Column(Text, nullable=True)
 
+    fingerprint = Column(String(64), nullable=True, index=True)
+
     description = Column(Text, nullable=True)
 
     status = Column(String(50), nullable=False, default="new")
