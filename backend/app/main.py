@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.job import Job
 from app.routes.jobs import router as jobs_router
+from app.routes.scrape import router as scrape_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -13,6 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(jobs_router)
+app.include_router(scrape_router)
 
 
 @app.get("/")
