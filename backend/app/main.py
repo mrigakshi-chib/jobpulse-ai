@@ -8,6 +8,7 @@ from app.routes.jobs import router as jobs_router
 from app.routes.scrape import router as scrape_router
 from app.routes.scheduler import router as scheduler_router
 from app.services.scheduler import start_scheduler, stop_scheduler
+from app.routes.company_scrape import router as company_scrape_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ app = FastAPI(
 app.include_router(jobs_router)
 app.include_router(scrape_router)
 app.include_router(scheduler_router)
+app.include_router(company_scrape_router)
 
 
 @app.get("/")
