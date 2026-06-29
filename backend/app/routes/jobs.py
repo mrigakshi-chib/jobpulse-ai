@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -100,6 +100,42 @@ def get_jobs(
 
     return jobs
 
+@router.get("/stats")
+def get_job_stats(db: Session = Depends(get_db)):
+    total_jobs = db.query(Job).count()
+
+    status_counts = (
+        db.query(Job.status, func.count(Job.id))
+        .group_by(Job.status)
+        .all()
+    )
+
+    source_counts = (
+        db.query(Job.source, func.count(Job.id))
+        .group_by(Job.source)
+        .all()
+    )
+
+    high_score_jobs = db.query(Job).filter(Job.score >= 80).count()
+
+    follow_ups_due = (
+        db.query(Job)
+        .filter(Job.follow_up_date.isnot(None))
+        .filter(Job.follow_up_date <= date.today())
+        .count()
+    )
+
+    return {
+        "total_jobs": total_jobs,
+        "high_score_jobs": high_score_jobs,
+        "follow_ups_due": follow_ups_due,
+        "status_counts": {
+            status: count for status, count in status_counts
+        },
+        "source_counts": {
+            source: count for source, count in source_counts
+        },
+    }
 
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)):
