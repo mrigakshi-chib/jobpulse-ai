@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,7 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.job import Job
-from app.schemas.job import JobCreate, JobResponse, JobStatusUpdate
+from app.schemas.job import (
+    JobApplicationUpdate,
+    JobCreate,
+    JobResponse,
+    JobStatusUpdate,
+)
 from app.services.dedupe import calculate_job_fingerprint
 from app.services.scoring import calculate_job_score
 
@@ -112,6 +118,34 @@ def update_job_status(
         )
 
     job.status = status_update.status
+
+    if status_update.status == "applied" and job.applied_at is None:
+        job.applied_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(job)
+
+    return job
+
+
+@router.patch("/{job_id}/application", response_model=JobResponse)
+def update_job_application_details(
+    job_id: int,
+    application_update: JobApplicationUpdate,
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    update_data = application_update.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        setattr(job, field, value)
 
     db.commit()
     db.refresh(job)

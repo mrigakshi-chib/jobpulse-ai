@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, Date, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -23,6 +23,11 @@ class Job(Base):
 
     status = Column(String(50), nullable=False, default="new")
     score = Column(Integer, nullable=False, default=0)
+
+    applied_at = Column(DateTime(timezone=True), nullable=True)
+    follow_up_date = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    resume_version = Column(String(100), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

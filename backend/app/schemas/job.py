@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel
@@ -35,9 +35,22 @@ class JobStatusUpdate(BaseModel):
     status: JobStatus
 
 
+class JobApplicationUpdate(BaseModel):
+    applied_at: Optional[datetime] = None
+    follow_up_date: Optional[date] = None
+    notes: Optional[str] = None
+    resume_version: Optional[str] = None
+
+
 class JobResponse(JobBase):
     id: int
     fingerprint: Optional[str] = None
+
+    applied_at: Optional[datetime] = None
+    follow_up_date: Optional[date] = None
+    notes: Optional[str] = None
+    resume_version: Optional[str] = None
+
     created_at: datetime
     updated_at: datetime
 
