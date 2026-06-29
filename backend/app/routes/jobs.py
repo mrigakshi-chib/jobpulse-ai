@@ -61,6 +61,9 @@ def get_jobs(
     source: Optional[str] = Query(default=None),
     min_score: Optional[int] = Query(default=None, ge=0, le=100),
     search: Optional[str] = Query(default=None),
+    location: Optional[str] = Query(default=None),
+    exclude_internships: bool = Query(default=False),
+    exclude_testing_roles: bool = Query(default=False),
     has_follow_up: Optional[bool] = Query(default=None),
     follow_up_before: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
@@ -72,6 +75,27 @@ def get_jobs(
 
     if source:
         query = query.filter(Job.source == source)
+
+    if location:
+        location_pattern = f"%{location}%"
+        query = query.filter(Job.location.ilike(location_pattern))
+
+    if exclude_internships:
+        query = query.filter(~Job.title.ilike("%intern%"))
+        query = query.filter(~Job.description.ilike("%internship%"))
+
+    if exclude_testing_roles:
+        query = query.filter(
+            ~or_(
+                Job.title.ilike("%test%"),
+                Job.title.ilike("%testing%"),
+                Job.title.ilike("%qa%"),
+                Job.title.ilike("%quality assurance%"),
+                Job.title.ilike("%sdet%"),
+                Job.title.ilike("%validation%"),
+                Job.title.ilike("%support%"),
+            )
+        )
 
     if min_score is not None:
         query = query.filter(Job.score >= min_score)

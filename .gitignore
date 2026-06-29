@@ -4,6 +4,8 @@ backend/.venv/
 __pycache__/
 *.pyc
 .env
+.env.local
+frontend/.env.local
 
 # Node / Next.js
 node_modules/
