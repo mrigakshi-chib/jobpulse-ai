@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -61,6 +61,8 @@ def get_jobs(
     source: Optional[str] = Query(default=None),
     min_score: Optional[int] = Query(default=None, ge=0, le=100),
     search: Optional[str] = Query(default=None),
+    has_follow_up: Optional[bool] = Query(default=None),
+    follow_up_before: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     query = db.query(Job)
@@ -84,6 +86,15 @@ def get_jobs(
                 Job.description.ilike(search_pattern),
             )
         )
+
+    if has_follow_up is True:
+        query = query.filter(Job.follow_up_date.isnot(None))
+
+    if has_follow_up is False:
+        query = query.filter(Job.follow_up_date.is_(None))
+
+    if follow_up_before:
+        query = query.filter(Job.follow_up_date <= follow_up_before)
 
     jobs = query.order_by(Job.created_at.desc()).all()
 
