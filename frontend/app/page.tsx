@@ -27,6 +27,7 @@ type Job = {
 };
 
 type TabKey =
+  | "all_new"
   | "priority"
   | "saved"
   | "applied"
@@ -57,14 +58,25 @@ type ScrapeRunResult = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+const TARGET_LOCATIONS =
+  "India,Remote,Work from home,WFH,Bangalore,Bengaluru,Hyderabad,Pune,Mumbai,Navi Mumbai,Delhi,New Delhi,Delhi NCR,NCR,Noida,Gurgaon,Gurugram";
+
+const ALL_NEW_MATCHES_URL =
+  `${API_URL}/jobs/?status=new&min_score=50` +
+  `&locations=${encodeURIComponent(TARGET_LOCATIONS)}` +
+  `&exclude_testing_roles=true&exclude_non_target_roles=true` +
+  `&exclude_not_relevant=true`;
+
 const PRIORITY_JOBS_URL =
-  `${API_URL}/jobs/?status=new&min_score=65&location=India` +
+  `${API_URL}/jobs/?status=new&min_score=65` +
+  `&locations=${encodeURIComponent(TARGET_LOCATIONS)}` +
   `&target_role=software&exclude_internships=true` +
   `&exclude_testing_roles=true&exclude_non_target_roles=true` +
   `&exclude_not_relevant=true`;
 
 const INTERNSHIP_JOBS_URL =
-  `${API_URL}/jobs/?status=new&min_score=60&location=India&search=intern` +
+  `${API_URL}/jobs/?status=new&min_score=40&search=intern` +
+  `&locations=${encodeURIComponent(TARGET_LOCATIONS)}` +
   `&exclude_testing_roles=true&exclude_non_target_roles=true` +
   `&exclude_not_relevant=true`;
 
@@ -75,13 +87,14 @@ const NOT_INTERESTED_JOBS_URL = `${API_URL}/jobs/?status=not_relevant`;
 export default function Home() {
   const [stats, setStats] = useState<JobStats | null>(null);
 
+  const [allNewJobs, setAllNewJobs] = useState<Job[]>([]);
   const [priorityJobs, setPriorityJobs] = useState<Job[]>([]);
   const [internshipJobs, setInternshipJobs] = useState<Job[]>([]);
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
   const [notInterestedJobs, setNotInterestedJobs] = useState<Job[]>([]);
 
-  const [activeTab, setActiveTab] = useState<TabKey>("priority");
+  const [activeTab, setActiveTab] = useState<TabKey>("all_new");
   const [loading, setLoading] = useState(true);
   const [updatingJobId, setUpdatingJobId] = useState<number | null>(null);
 
@@ -92,6 +105,7 @@ export default function Home() {
     try {
       const [
         statsResponse,
+        allNewResponse,
         priorityResponse,
         internshipResponse,
         savedResponse,
@@ -99,6 +113,7 @@ export default function Home() {
         notInterestedResponse,
       ] = await Promise.all([
         fetch(`${API_URL}/jobs/stats`),
+        fetch(ALL_NEW_MATCHES_URL),
         fetch(PRIORITY_JOBS_URL),
         fetch(INTERNSHIP_JOBS_URL),
         fetch(SAVED_JOBS_URL),
@@ -107,6 +122,7 @@ export default function Home() {
       ]);
 
       const statsData = await statsResponse.json();
+      const allNewData = await allNewResponse.json();
       const priorityData = await priorityResponse.json();
       const internshipData = await internshipResponse.json();
       const savedData = await savedResponse.json();
@@ -114,6 +130,7 @@ export default function Home() {
       const notInterestedData = await notInterestedResponse.json();
 
       setStats(statsData);
+      setAllNewJobs(allNewData);
       setPriorityJobs(priorityData);
       setInternshipJobs(internshipData);
       setSavedJobs(savedData);
@@ -224,12 +241,22 @@ export default function Home() {
   const tabs = useMemo(
     () => [
       {
+        key: "all_new" as const,
+        label: "All New Matches",
+        count: allNewJobs.length,
+        title: "All new matches",
+        description:
+          "A broader review list of newly found jobs from your target Indian and remote locations.",
+        emptyText: "No new matches found right now.",
+        jobs: allNewJobs,
+      },
+      {
         key: "priority" as const,
         label: "New Priority",
         count: priorityJobs.length,
         title: "New full-time priority jobs",
         description:
-          "Fresh new full-time roles in India that match your target software roles.",
+          "Strictly filtered full-time roles that best match your software job target.",
         emptyText: "No new priority jobs found right now.",
         jobs: priorityJobs,
       },
@@ -257,7 +284,7 @@ export default function Home() {
         count: internshipJobs.length,
         title: "Internship / conversion opportunities",
         description:
-          "Internships in India that may be useful if they have PPO or full-time conversion potential.",
+          "Internships that may be useful if they have PPO or full-time conversion potential.",
         emptyText: "No internship opportunities found right now.",
         jobs: internshipJobs,
       },
@@ -272,7 +299,14 @@ export default function Home() {
         jobs: notInterestedJobs,
       },
     ],
-    [priorityJobs, savedJobs, appliedJobs, internshipJobs, notInterestedJobs]
+    [
+      allNewJobs,
+      priorityJobs,
+      savedJobs,
+      appliedJobs,
+      internshipJobs,
+      notInterestedJobs,
+    ]
   );
 
   const activeTabData = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];

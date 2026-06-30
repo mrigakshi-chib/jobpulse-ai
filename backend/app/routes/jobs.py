@@ -16,25 +16,32 @@ from app.schemas.job import (
 from app.services.dedupe import calculate_job_fingerprint
 from app.services.scoring import calculate_job_score
 
-
-router = APIRouter(
-    prefix="/jobs",
-    tags=["Jobs"],
-)
+router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.post("/", response_model=JobResponse)
+def schema_to_dict(schema, exclude_unset: bool = False):
+    if hasattr(schema, "model_dump"):
+        return schema.model_dump(exclude_unset=exclude_unset)
+
+    return schema.dict(exclude_unset=exclude_unset)
+
+
+@router.post("/", response_model=JobResponse, status_code=201)
 def create_job(job: JobCreate, db: Session = Depends(get_db)):
-    job_data = job.model_dump()
-    job_data["score"] = calculate_job_score(job_data)
-    job_data["fingerprint"] = calculate_job_fingerprint(job_data)
+    job_data = schema_to_dict(job)
+
+    fingerprint = calculate_job_fingerprint(
+        title=job.title,
+        company=job.company,
+        location=job.location,
+    )
 
     existing_job = (
         db.query(Job)
         .filter(
             or_(
-                Job.job_url == job_data["job_url"],
-                Job.fingerprint == job_data["fingerprint"],
+                Job.job_url == job.job_url,
+                Job.fingerprint == fingerprint,
             )
         )
         .first()
@@ -42,11 +49,20 @@ def create_job(job: JobCreate, db: Session = Depends(get_db)):
 
     if existing_job:
         raise HTTPException(
-            status_code=400,
-            detail="Duplicate job already exists",
+            status_code=409,
+            detail="Job already exists",
         )
 
-    new_job = Job(**job_data)
+    score = calculate_job_score(
+        title=job.title,
+        description=job.description or "",
+    )
+
+    new_job = Job(
+        **job_data,
+        fingerprint=fingerprint,
+        score=score,
+    )
 
     db.add(new_job)
     db.commit()
@@ -62,6 +78,7 @@ def get_jobs(
     min_score: Optional[int] = Query(default=None, ge=0, le=100),
     search: Optional[str] = Query(default=None),
     location: Optional[str] = Query(default=None),
+    locations: Optional[str] = Query(default=None),
     target_role: Optional[str] = Query(default=None),
     exclude_internships: bool = Query(default=False),
     exclude_testing_roles: bool = Query(default=False),
@@ -75,19 +92,50 @@ def get_jobs(
 
     if status:
         query = query.filter(Job.status == status)
-    
+
     if exclude_not_relevant:
         query = query.filter(Job.status != "not_relevant")
 
     if source:
         query = query.filter(Job.source == source)
 
+    if min_score is not None:
+        query = query.filter(Job.score >= min_score)
+
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Job.title.ilike(search_pattern),
+                Job.company.ilike(search_pattern),
+                Job.location.ilike(search_pattern),
+                Job.description.ilike(search_pattern),
+            )
+        )
+
     if location:
         location_pattern = f"%{location}%"
         query = query.filter(Job.location.ilike(location_pattern))
 
+    if locations:
+        location_terms = [
+            term.strip()
+            for term in locations.split(",")
+            if term.strip()
+        ]
+
+        if location_terms:
+            query = query.filter(
+                or_(
+                    *[
+                        Job.location.ilike(f"%{term}%")
+                        for term in location_terms
+                    ]
+                )
+            )
+
     if target_role:
-        role = target_role.lower()
+        role = target_role.lower().strip()
 
         if role == "backend":
             query = query.filter(
@@ -103,6 +151,7 @@ def get_jobs(
                     Job.description.ilike("%fastapi%"),
                     Job.description.ilike("%django%"),
                     Job.description.ilike("%spring%"),
+                    Job.description.ilike("%node%"),
                 )
             )
 
@@ -113,6 +162,7 @@ def get_jobs(
                     Job.title.ilike("%front end%"),
                     Job.title.ilike("%react%"),
                     Job.title.ilike("%next%"),
+                    Job.title.ilike("%web developer%"),
                     Job.description.ilike("%frontend%"),
                     Job.description.ilike("%react%"),
                     Job.description.ilike("%javascript%"),
@@ -125,9 +175,11 @@ def get_jobs(
             query = query.filter(
                 or_(
                     Job.title.ilike("%full stack%"),
+                    Job.title.ilike("%full-stack%"),
                     Job.title.ilike("%fullstack%"),
                     Job.title.ilike("%mern%"),
                     Job.description.ilike("%full stack%"),
+                    Job.description.ilike("%full-stack%"),
                     Job.description.ilike("%fullstack%"),
                     Job.description.ilike("%react%"),
                     Job.description.ilike("%node%"),
@@ -141,7 +193,19 @@ def get_jobs(
                     Job.title.ilike("%software developer%"),
                     Job.title.ilike("%associate software engineer%"),
                     Job.title.ilike("%junior software engineer%"),
-                    Job.title.ilike("%developer%"),
+                    Job.title.ilike("%junior software developer%"),
+                    Job.title.ilike("%backend developer%"),
+                    Job.title.ilike("%backend engineer%"),
+                    Job.title.ilike("%frontend developer%"),
+                    Job.title.ilike("%frontend engineer%"),
+                    Job.title.ilike("%front end developer%"),
+                    Job.title.ilike("%full stack developer%"),
+                    Job.title.ilike("%full-stack developer%"),
+                    Job.title.ilike("%python developer%"),
+                    Job.title.ilike("%java developer%"),
+                    Job.title.ilike("%react developer%"),
+                    Job.title.ilike("%node developer%"),
+                    Job.title.ilike("%web developer%"),
                 )
             )
 
@@ -181,8 +245,15 @@ def get_jobs(
             )
 
     if exclude_internships:
-        query = query.filter(~Job.title.ilike("%intern%"))
-        query = query.filter(~Job.description.ilike("%internship%"))
+        query = query.filter(
+            ~or_(
+                Job.title.ilike("%intern%"),
+                Job.title.ilike("%internship%"),
+                Job.title.ilike("%trainee intern%"),
+                Job.description.ilike("%internship%"),
+                Job.description.ilike("%intern%"),
+            )
+        )
 
     if exclude_testing_roles:
         query = query.filter(
@@ -192,6 +263,8 @@ def get_jobs(
                 Job.title.ilike("%qa%"),
                 Job.title.ilike("%quality assurance%"),
                 Job.title.ilike("%sdet%"),
+                Job.title.ilike("%automation tester%"),
+                Job.title.ilike("%manual tester%"),
                 Job.title.ilike("%validation%"),
                 Job.title.ilike("%support%"),
             )
@@ -199,35 +272,36 @@ def get_jobs(
 
     if exclude_non_target_roles:
         query = query.filter(
-            ~or_(
-                Job.title.ilike("%release%"),
-                Job.title.ilike("%devops%"),
-                Job.title.ilike("%site reliability%"),
-                Job.title.ilike("%sre%"),
-                Job.title.ilike("%embedded%"),
-                Job.title.ilike("%firmware%"),
-                Job.title.ilike("%hardware%"),
-                Job.title.ilike("%validation%"),
-                Job.title.ilike("%support%"),
-                Job.title.ilike("%consultant%"),
-                Job.title.ilike("%business analyst%"),
-                Job.title.ilike("%data analyst%"),
-            )
+        ~or_(
+            Job.title.ilike("%senior%"),
+            Job.title.ilike("%sr.%"),
+            Job.title.ilike("%lead%"),
+            Job.title.ilike("%staff%"),
+            Job.title.ilike("%principal%"),
+            Job.title.ilike("%architect%"),
+            Job.title.ilike("%manager%"),
+            Job.title.ilike("%director%"),
+            Job.title.ilike("%head%"),
+            Job.title.ilike("%release%"),
+            Job.title.ilike("%devops%"),
+            Job.title.ilike("%site reliability%"),
+            Job.title.ilike("%sre%"),
+            Job.title.ilike("%embedded%"),
+            Job.title.ilike("%firmware%"),
+            Job.title.ilike("%hardware%"),
+            Job.title.ilike("%validation%"),
+            Job.title.ilike("%support%"),
+            Job.title.ilike("%consultant%"),
+            Job.title.ilike("%business analyst%"),
+            Job.title.ilike("%data analyst%"),
+            Job.title.ilike("%data engineer%"),
+            Job.title.ilike("%customer success%"),
+            Job.title.ilike("%customer support%"),
+            Job.title.ilike("%technical support%"),
+            Job.title.ilike("%sales%"),
+            Job.title.ilike("%marketing%"),
         )
-
-    if min_score is not None:
-        query = query.filter(Job.score >= min_score)
-
-    if search:
-        search_pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Job.title.ilike(search_pattern),
-                Job.company.ilike(search_pattern),
-                Job.location.ilike(search_pattern),
-                Job.description.ilike(search_pattern),
-            )
-        )
+    )
 
     if has_follow_up is True:
         query = query.filter(Job.follow_up_date.isnot(None))
@@ -238,46 +312,63 @@ def get_jobs(
     if follow_up_before:
         query = query.filter(Job.follow_up_date <= follow_up_before)
 
-    jobs = query.order_by(Job.created_at.desc()).all()
+    jobs = query.order_by(Job.score.desc(), Job.created_at.desc()).all()
 
     return jobs
 
+
 @router.get("/stats")
 def get_job_stats(db: Session = Depends(get_db)):
-    total_jobs = db.query(Job).count()
+    total_jobs = db.query(func.count(Job.id)).scalar() or 0
 
-    status_counts = (
+    high_score_jobs = (
+        db.query(func.count(Job.id))
+        .filter(Job.score >= 65)
+        .scalar()
+        or 0
+    )
+
+    follow_ups_due = (
+        db.query(func.count(Job.id))
+        .filter(
+            Job.follow_up_date.isnot(None),
+            Job.follow_up_date <= date.today(),
+            Job.status != "not_relevant",
+        )
+        .scalar()
+        or 0
+    )
+
+    status_rows = (
         db.query(Job.status, func.count(Job.id))
         .group_by(Job.status)
         .all()
     )
 
-    source_counts = (
+    source_rows = (
         db.query(Job.source, func.count(Job.id))
         .group_by(Job.source)
         .all()
     )
 
-    high_score_jobs = db.query(Job).filter(Job.score >= 80).count()
+    status_counts = {
+        status_value or "unknown": count
+        for status_value, count in status_rows
+    }
 
-    follow_ups_due = (
-        db.query(Job)
-        .filter(Job.follow_up_date.isnot(None))
-        .filter(Job.follow_up_date <= date.today())
-        .count()
-    )
+    source_counts = {
+        source_value or "unknown": count
+        for source_value, count in source_rows
+    }
 
     return {
         "total_jobs": total_jobs,
         "high_score_jobs": high_score_jobs,
         "follow_ups_due": follow_ups_due,
-        "status_counts": {
-            status: count for status, count in status_counts
-        },
-        "source_counts": {
-            source: count for source, count in source_counts
-        },
+        "status_counts": status_counts,
+        "source_counts": source_counts,
     }
+
 
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)):
@@ -318,7 +409,7 @@ def update_job_status(
 
 
 @router.patch("/{job_id}/application", response_model=JobResponse)
-def update_job_application_details(
+def update_job_application(
     job_id: int,
     application_update: JobApplicationUpdate,
     db: Session = Depends(get_db),
@@ -331,7 +422,7 @@ def update_job_application_details(
             detail="Job not found",
         )
 
-    update_data = application_update.model_dump(exclude_unset=True)
+    update_data = schema_to_dict(application_update, exclude_unset=True)
 
     for field, value in update_data.items():
         setattr(job, field, value)
