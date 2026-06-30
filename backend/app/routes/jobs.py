@@ -66,6 +66,7 @@ def get_jobs(
     exclude_internships: bool = Query(default=False),
     exclude_testing_roles: bool = Query(default=False),
     exclude_non_target_roles: bool = Query(default=False),
+    exclude_not_relevant: bool = Query(default=False),
     has_follow_up: Optional[bool] = Query(default=None),
     follow_up_before: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
@@ -74,6 +75,9 @@ def get_jobs(
 
     if status:
         query = query.filter(Job.status == status)
+    
+    if exclude_not_relevant:
+        query = query.filter(Job.status != "not_relevant")
 
     if source:
         query = query.filter(Job.source == source)

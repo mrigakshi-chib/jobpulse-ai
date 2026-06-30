@@ -31,37 +31,63 @@ export default function Home() {
   const [fullTimeJobs, setFullTimeJobs] = useState<Job[]>([]);
   const [internshipJobs, setInternshipJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingJobId, setUpdatingJobId] = useState<number | null>(null);
+
+  async function loadDashboard() {
+    try {
+      const [statsResponse, fullTimeResponse, internshipResponse] =
+        await Promise.all([
+          fetch(`${API_URL}/jobs/stats`),
+          fetch(
+  `${API_URL}/jobs/?min_score=65&location=India&target_role=software&exclude_internships=true&exclude_testing_roles=true&exclude_non_target_roles=true&exclude_not_relevant=true`
+),
+          fetch(
+  `${API_URL}/jobs/?min_score=60&location=India&search=intern&exclude_testing_roles=true&exclude_non_target_roles=true&exclude_not_relevant=true`
+),
+        ]);
+
+      const statsData = await statsResponse.json();
+      const fullTimeData = await fullTimeResponse.json();
+      const internshipData = await internshipResponse.json();
+
+      setStats(statsData);
+      setFullTimeJobs(fullTimeData);
+      setInternshipJobs(internshipData);
+    } catch (error) {
+      console.error("Failed to load dashboard", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const [statsResponse, fullTimeResponse, internshipResponse] =
-          await Promise.all([
-            fetch(`${API_URL}/jobs/stats`),
-            fetch(
-  `${API_URL}/jobs/?min_score=65&location=India&target_role=software&exclude_internships=true&exclude_testing_roles=true&exclude_non_target_roles=true`
-),
-            fetch(
-  `${API_URL}/jobs/?min_score=60&location=India&search=intern&exclude_testing_roles=true&exclude_non_target_roles=true`
-),
-          ]);
-
-        const statsData = await statsResponse.json();
-        const fullTimeData = await fullTimeResponse.json();
-        const internshipData = await internshipResponse.json();
-
-        setStats(statsData);
-        setFullTimeJobs(fullTimeData);
-        setInternshipJobs(internshipData);
-      } catch (error) {
-        console.error("Failed to load dashboard", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadDashboard();
   }, []);
+
+  async function updateJobStatus(jobId: number, status: string) {
+    try {
+      setUpdatingJobId(jobId);
+
+      const response = await fetch(`${API_URL}/jobs/${jobId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update job status");
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      console.error("Failed to update job status", error);
+      alert("Could not update job status. Please try again.");
+    } finally {
+      setUpdatingJobId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -101,6 +127,8 @@ export default function Home() {
           title="Full-time priority jobs"
           description="Fresher-friendly full-time roles in India with score 65 or above."
           jobs={fullTimeJobs}
+          updatingJobId={updatingJobId}
+          onStatusChange={updateJobStatus}
         />
 
         <div className="mt-8">
@@ -108,6 +136,8 @@ export default function Home() {
             title="Internship / conversion opportunities"
             description="Internships in India that may be useful if they have PPO or full-time conversion potential."
             jobs={internshipJobs}
+            updatingJobId={updatingJobId}
+            onStatusChange={updateJobStatus}
           />
         </div>
       </section>
@@ -128,10 +158,14 @@ function JobSection({
   title,
   description,
   jobs,
+  updatingJobId,
+  onStatusChange,
 }: {
   title: string;
   description: string;
   jobs: Job[];
+  updatingJobId: number | null;
+  onStatusChange: (jobId: number, status: string) => void;
 }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -144,49 +178,94 @@ function JobSection({
         {jobs.length === 0 ? (
           <p className="p-5 text-slate-400">No jobs found in this section yet.</p>
         ) : (
-          jobs.map((job) => <JobRow key={job.id} job={job} />)
+          jobs.map((job) => (
+            <JobRow
+              key={job.id}
+              job={job}
+              updatingJobId={updatingJobId}
+              onStatusChange={onStatusChange}
+            />
+          ))
         )}
       </div>
     </div>
   );
 }
 
-function JobRow({ job }: { job: Job }) {
+function JobRow({
+  job,
+  updatingJobId,
+  onStatusChange,
+}: {
+  job: Job;
+  updatingJobId: number | null;
+  onStatusChange: (jobId: number, status: string) => void;
+}) {
+  const isUpdating = updatingJobId === job.id;
+
   return (
-    <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-      <div>
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="text-xs bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded-full">
-            Score {job.score}
-          </span>
-          <span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full">
-            {job.status}
-          </span>
-          <span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full">
-            {job.source}
-          </span>
+    <div className="p-5 flex flex-col gap-4">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-xs bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded-full">
+              Score {job.score}
+            </span>
+            <span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full">
+              {job.status}
+            </span>
+            <span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full">
+              {job.source}
+            </span>
+          </div>
+
+          <h3 className="font-semibold text-lg">{job.title}</h3>
+          <p className="text-slate-400 text-sm mt-1">
+            {job.company} · {job.location ?? "Location not specified"}
+          </p>
+
+          {job.follow_up_date && (
+            <p className="text-sm text-yellow-300 mt-2">
+              Follow up: {job.follow_up_date}
+            </p>
+          )}
         </div>
 
-        <h3 className="font-semibold text-lg">{job.title}</h3>
-        <p className="text-slate-400 text-sm mt-1">
-          {job.company} · {job.location ?? "Location not specified"}
-        </p>
-
-        {job.follow_up_date && (
-          <p className="text-sm text-yellow-300 mt-2">
-            Follow up: {job.follow_up_date}
-          </p>
-        )}
+        <a
+          href={job.apply_url || job.job_url}
+          target="_blank"
+          rel="noreferrer"
+          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-center"
+        >
+          Apply
+        </a>
       </div>
 
-      <a
-        href={job.apply_url || job.job_url}
-        target="_blank"
-        rel="noreferrer"
-        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-center"
-      >
-        Apply
-      </a>
+      <div className="flex flex-wrap gap-2">
+        <button
+          disabled={isUpdating}
+          onClick={() => onStatusChange(job.id, "saved")}
+          className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 px-3 py-2 rounded-xl text-sm"
+        >
+          Save
+        </button>
+
+        <button
+          disabled={isUpdating}
+          onClick={() => onStatusChange(job.id, "applied")}
+          className="bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 text-blue-200 px-3 py-2 rounded-xl text-sm"
+        >
+          Mark Applied
+        </button>
+
+        <button
+          disabled={isUpdating}
+          onClick={() => onStatusChange(job.id, "not_relevant")}
+          className="bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-200 px-3 py-2 rounded-xl text-sm"
+        >
+          Not Relevant
+        </button>
+      </div>
     </div>
   );
 }
