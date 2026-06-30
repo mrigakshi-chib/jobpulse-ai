@@ -43,12 +43,17 @@ type ApplicationUpdateInput = {
 type ScrapeRunResult = {
   message?: string;
   total_fetched?: number;
+  total_inserted?: number;
   inserted?: number;
   inserted_jobs?: number;
   duplicates?: number;
   skipped_duplicates?: number;
+  total_skipped_low_quality?: number;
+  skipped_low_quality?: number;
+  enabled_sources?: number;
   result?: {
     total_fetched?: number;
+    total_inserted?: number;
     inserted?: number;
     inserted_jobs?: number;
     duplicates?: number;
@@ -203,32 +208,56 @@ export default function Home() {
   async function runFreshJobsSearch() {
     try {
       setScrapeRunning(true);
-      setScrapeMessage("Searching for fresh jobs...");
+      setScrapeMessage("Searching JobSpy and company career pages...");
 
-      const response = await fetch(`${API_URL}/scheduler/run-now`, {
-        method: "POST",
-      });
+      const [jobspyResponse, companyResponse] = await Promise.all([
+        fetch(`${API_URL}/scheduler/run-now`, {
+          method: "POST",
+        }),
+        fetch(`${API_URL}/scrape/companies/?min_score=60`, {
+          method: "POST",
+        }),
+      ]);
 
-      if (!response.ok) {
-        throw new Error("Failed to run scraper");
+      if (!jobspyResponse.ok) {
+        throw new Error("Failed to run JobSpy scraper");
       }
 
-      const data: ScrapeRunResult = await response.json();
+      if (!companyResponse.ok) {
+        throw new Error("Failed to run company career-page scraper");
+      }
 
-      const inserted =
-        data.inserted ??
-        data.inserted_jobs ??
-        data.result?.inserted ??
-        data.result?.inserted_jobs;
+      const jobspyData: ScrapeRunResult = await jobspyResponse.json();
+      const companyData: ScrapeRunResult = await companyResponse.json();
 
-      const fetched = data.total_fetched ?? data.result?.total_fetched;
+      const jobspyFetched =
+        jobspyData.total_fetched ?? jobspyData.result?.total_fetched ?? 0;
+
+      const jobspyInserted =
+        jobspyData.inserted ??
+        jobspyData.total_inserted ??
+        jobspyData.inserted_jobs ??
+        jobspyData.result?.inserted ??
+        jobspyData.result?.total_inserted ??
+        jobspyData.result?.inserted_jobs ??
+        0;
+
+      const companyFetched =
+        companyData.total_fetched ?? companyData.result?.total_fetched ?? 0;
+
+      const companyInserted =
+        companyData.inserted ??
+        companyData.total_inserted ??
+        companyData.inserted_jobs ??
+        companyData.result?.inserted ??
+        companyData.result?.total_inserted ??
+        companyData.result?.inserted_jobs ??
+        0;
 
       await loadDashboard();
 
       setScrapeMessage(
-        `Fresh search complete. Fetched ${
-          fetched ?? "some"
-        } jobs and inserted ${inserted ?? "some"} new matches.`
+        `Fresh search complete. JobSpy fetched ${jobspyFetched} jobs and inserted ${jobspyInserted}. Company pages fetched ${companyFetched} jobs and inserted ${companyInserted}.`
       );
     } catch (error) {
       console.error("Failed to run fresh jobs search", error);

@@ -1,4 +1,5 @@
 COMPANY_SOURCES = [
+    # Existing sources
     {
         "company": "Veeva Systems",
         "ats": "lever",
@@ -33,6 +34,32 @@ COMPANY_SOURCES = [
         "company": "Coupa",
         "ats": "lever",
         "token": "coupa",
+        "enabled": True,
+    },
+
+    # New fresher/internship-friendly sources
+    {
+        "company": "Drivetrain",
+        "ats": "lever",
+        "token": "drivetrain",
+        "enabled": True,
+    },
+    {
+        "company": "Stable Money",
+        "ats": "lever",
+        "token": "stable-money1",
+        "enabled": True,
+    },
+    {
+        "company": "ValGenesis",
+        "ats": "lever",
+        "token": "valgenesis",
+        "enabled": True,
+    },
+    {
+        "company": "ShopBack",
+        "ats": "lever",
+        "token": "shopback-2",
         "enabled": True,
     },
 ]
