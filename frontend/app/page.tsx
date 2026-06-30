@@ -39,10 +39,10 @@ export default function Home() {
           await Promise.all([
             fetch(`${API_URL}/jobs/stats`),
             fetch(
-  `${API_URL}/jobs/?min_score=65&location=India&exclude_internships=true&exclude_testing_roles=true`
+  `${API_URL}/jobs/?min_score=65&location=India&target_role=software&exclude_internships=true&exclude_testing_roles=true&exclude_non_target_roles=true`
 ),
             fetch(
-  `${API_URL}/jobs/?min_score=60&location=India&search=intern&exclude_testing_roles=true`
+  `${API_URL}/jobs/?min_score=60&location=India&search=intern&exclude_testing_roles=true&exclude_non_target_roles=true`
 ),
           ]);
 
