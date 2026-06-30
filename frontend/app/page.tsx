@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type JobStats = {
   total_jobs: number;
@@ -24,35 +24,67 @@ type Job = {
   resume_version?: string | null;
 };
 
+type TabKey = "priority" | "saved" | "applied" | "internships" | "not_interested";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const PRIORITY_JOBS_URL =
+  `${API_URL}/jobs/?status=new&min_score=65&location=India` +
+  `&target_role=software&exclude_internships=true` +
+  `&exclude_testing_roles=true&exclude_non_target_roles=true` +
+  `&exclude_not_relevant=true`;
+
+const INTERNSHIP_JOBS_URL =
+  `${API_URL}/jobs/?status=new&min_score=60&location=India&search=intern` +
+  `&exclude_testing_roles=true&exclude_non_target_roles=true` +
+  `&exclude_not_relevant=true`;
+
+const SAVED_JOBS_URL = `${API_URL}/jobs/?status=saved&exclude_not_relevant=true`;
+const APPLIED_JOBS_URL = `${API_URL}/jobs/?status=applied&exclude_not_relevant=true`;
+const NOT_INTERESTED_JOBS_URL = `${API_URL}/jobs/?status=not_relevant`;
 
 export default function Home() {
   const [stats, setStats] = useState<JobStats | null>(null);
-  const [fullTimeJobs, setFullTimeJobs] = useState<Job[]>([]);
+  const [priorityJobs, setPriorityJobs] = useState<Job[]>([]);
   const [internshipJobs, setInternshipJobs] = useState<Job[]>([]);
+  const [savedJobs, setSavedJobs] = useState<Job[]>([]);
+  const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
+  const [notInterestedJobs, setNotInterestedJobs] = useState<Job[]>([]);
+  const [activeTab, setActiveTab] = useState<TabKey>("priority");
   const [loading, setLoading] = useState(true);
   const [updatingJobId, setUpdatingJobId] = useState<number | null>(null);
 
   async function loadDashboard() {
     try {
-      const [statsResponse, fullTimeResponse, internshipResponse] =
-        await Promise.all([
-          fetch(`${API_URL}/jobs/stats`),
-          fetch(
-  `${API_URL}/jobs/?min_score=65&location=India&target_role=software&exclude_internships=true&exclude_testing_roles=true&exclude_non_target_roles=true&exclude_not_relevant=true`
-),
-          fetch(
-  `${API_URL}/jobs/?min_score=60&location=India&search=intern&exclude_testing_roles=true&exclude_non_target_roles=true&exclude_not_relevant=true`
-),
-        ]);
+      const [
+        statsResponse,
+        priorityResponse,
+        internshipResponse,
+        savedResponse,
+        appliedResponse,
+        notInterestedResponse,
+      ] = await Promise.all([
+        fetch(`${API_URL}/jobs/stats`),
+        fetch(PRIORITY_JOBS_URL),
+        fetch(INTERNSHIP_JOBS_URL),
+        fetch(SAVED_JOBS_URL),
+        fetch(APPLIED_JOBS_URL),
+        fetch(NOT_INTERESTED_JOBS_URL),
+      ]);
 
       const statsData = await statsResponse.json();
-      const fullTimeData = await fullTimeResponse.json();
+      const priorityData = await priorityResponse.json();
       const internshipData = await internshipResponse.json();
+      const savedData = await savedResponse.json();
+      const appliedData = await appliedResponse.json();
+      const notInterestedData = await notInterestedResponse.json();
 
       setStats(statsData);
-      setFullTimeJobs(fullTimeData);
+      setPriorityJobs(priorityData);
       setInternshipJobs(internshipData);
+      setSavedJobs(savedData);
+      setAppliedJobs(appliedData);
+      setNotInterestedJobs(notInterestedData);
     } catch (error) {
       console.error("Failed to load dashboard", error);
     } finally {
@@ -89,6 +121,62 @@ export default function Home() {
     }
   }
 
+  const tabs = useMemo(
+    () => [
+      {
+        key: "priority" as const,
+        label: "New Priority",
+        count: priorityJobs.length,
+        title: "New full-time priority jobs",
+        description:
+          "Fresh new full-time roles in India that match your target software roles.",
+        emptyText: "No new priority jobs found right now.",
+        jobs: priorityJobs,
+      },
+      {
+        key: "saved" as const,
+        label: "Saved",
+        count: savedJobs.length,
+        title: "Saved jobs",
+        description: "Jobs you saved to review or apply to later.",
+        emptyText: "No saved jobs yet.",
+        jobs: savedJobs,
+      },
+      {
+        key: "applied" as const,
+        label: "Applied",
+        count: appliedJobs.length,
+        title: "Applied jobs",
+        description: "Jobs you have already applied to.",
+        emptyText: "No applied jobs yet.",
+        jobs: appliedJobs,
+      },
+      {
+        key: "internships" as const,
+        label: "Internships",
+        count: internshipJobs.length,
+        title: "Internship / conversion opportunities",
+        description:
+          "Internships in India that may be useful if they have PPO or full-time conversion potential.",
+        emptyText: "No internship opportunities found right now.",
+        jobs: internshipJobs,
+      },
+      {
+        key: "not_interested" as const,
+        label: "Not Interested",
+        count: notInterestedJobs.length,
+        title: "Not interested",
+        description:
+          "Jobs you marked as not relevant. They are hidden from your active dashboard but kept here for review.",
+        emptyText: "No jobs marked as not interested yet.",
+        jobs: notInterestedJobs,
+      },
+    ],
+    [priorityJobs, savedJobs, appliedJobs, internshipJobs, notInterestedJobs]
+  );
+
+  const activeTabData = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 text-white p-8">
@@ -123,23 +211,35 @@ export default function Home() {
           </div>
         )}
 
+        <div className="mb-5 flex flex-wrap gap-2">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key;
+
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={
+                  isActive
+                    ? "bg-emerald-500 text-slate-950 font-semibold px-4 py-2 rounded-xl"
+                    : "bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 px-4 py-2 rounded-xl"
+                }
+              >
+                {tab.label}
+                <span className="ml-2 text-xs opacity-80">({tab.count})</span>
+              </button>
+            );
+          })}
+        </div>
+
         <JobSection
-          title="Full-time priority jobs"
-          description="Fresher-friendly full-time roles in India with score 65 or above."
-          jobs={fullTimeJobs}
+          title={activeTabData.title}
+          description={activeTabData.description}
+          jobs={activeTabData.jobs}
+          emptyText={activeTabData.emptyText}
           updatingJobId={updatingJobId}
           onStatusChange={updateJobStatus}
         />
-
-        <div className="mt-8">
-          <JobSection
-            title="Internship / conversion opportunities"
-            description="Internships in India that may be useful if they have PPO or full-time conversion potential."
-            jobs={internshipJobs}
-            updatingJobId={updatingJobId}
-            onStatusChange={updateJobStatus}
-          />
-        </div>
       </section>
     </main>
   );
@@ -158,12 +258,14 @@ function JobSection({
   title,
   description,
   jobs,
+  emptyText,
   updatingJobId,
   onStatusChange,
 }: {
   title: string;
   description: string;
   jobs: Job[];
+  emptyText: string;
   updatingJobId: number | null;
   onStatusChange: (jobId: number, status: string) => void;
 }) {
@@ -176,7 +278,7 @@ function JobSection({
 
       <div className="divide-y divide-slate-800">
         {jobs.length === 0 ? (
-          <p className="p-5 text-slate-400">No jobs found in this section yet.</p>
+          <p className="p-5 text-slate-400">{emptyText}</p>
         ) : (
           jobs.map((job) => (
             <JobRow
@@ -202,6 +304,16 @@ function JobRow({
   onStatusChange: (jobId: number, status: string) => void;
 }) {
   const isUpdating = updatingJobId === job.id;
+
+  function handleNotRelevant() {
+    const confirmed = window.confirm(
+      "Move this job to Not Interested? You can still find it in the Not Interested tab."
+    );
+
+    if (confirmed) {
+      onStatusChange(job.id, "not_relevant");
+    }
+  }
 
   return (
     <div className="p-5 flex flex-col gap-4">
@@ -260,7 +372,7 @@ function JobRow({
 
         <button
           disabled={isUpdating}
-          onClick={() => onStatusChange(job.id, "not_relevant")}
+          onClick={handleNotRelevant}
           className="bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-200 px-3 py-2 rounded-xl text-sm"
         >
           Not Relevant
