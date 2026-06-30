@@ -20,11 +20,19 @@ type Job = {
   apply_url?: string | null;
   status: string;
   score: number;
+  applied_at?: string | null;
   follow_up_date?: string | null;
+  notes?: string | null;
   resume_version?: string | null;
 };
 
 type TabKey = "priority" | "saved" | "applied" | "internships" | "not_interested";
+
+type ApplicationUpdateInput = {
+  follow_up_date: string | null;
+  resume_version: string | null;
+  notes: string | null;
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -116,6 +124,34 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to update job status", error);
       alert("Could not update job status. Please try again.");
+    } finally {
+      setUpdatingJobId(null);
+    }
+  }
+
+  async function updateJobApplication(
+    jobId: number,
+    data: ApplicationUpdateInput
+  ) {
+    try {
+      setUpdatingJobId(jobId);
+
+      const response = await fetch(`${API_URL}/jobs/${jobId}/application`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update application details");
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      console.error("Failed to update application details", error);
+      alert("Could not save application details. Please try again.");
     } finally {
       setUpdatingJobId(null);
     }
@@ -239,6 +275,9 @@ export default function Home() {
           emptyText={activeTabData.emptyText}
           updatingJobId={updatingJobId}
           onStatusChange={updateJobStatus}
+          onApplicationUpdate={updateJobApplication}
+          showTrackingForm={activeTab !== "not_interested"}
+          showNotRelevantButton={activeTab !== "not_interested"}
         />
       </section>
     </main>
@@ -261,6 +300,9 @@ function JobSection({
   emptyText,
   updatingJobId,
   onStatusChange,
+  onApplicationUpdate,
+  showTrackingForm,
+  showNotRelevantButton,
 }: {
   title: string;
   description: string;
@@ -268,6 +310,9 @@ function JobSection({
   emptyText: string;
   updatingJobId: number | null;
   onStatusChange: (jobId: number, status: string) => void;
+  onApplicationUpdate: (jobId: number, data: ApplicationUpdateInput) => void;
+  showTrackingForm: boolean;
+  showNotRelevantButton: boolean;
 }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -286,6 +331,9 @@ function JobSection({
               job={job}
               updatingJobId={updatingJobId}
               onStatusChange={onStatusChange}
+              onApplicationUpdate={onApplicationUpdate}
+              showTrackingForm={showTrackingForm}
+              showNotRelevantButton={showNotRelevantButton}
             />
           ))
         )}
@@ -298,10 +346,16 @@ function JobRow({
   job,
   updatingJobId,
   onStatusChange,
+  onApplicationUpdate,
+  showTrackingForm,
+  showNotRelevantButton,
 }: {
   job: Job;
   updatingJobId: number | null;
   onStatusChange: (jobId: number, status: string) => void;
+  onApplicationUpdate: (jobId: number, data: ApplicationUpdateInput) => void;
+  showTrackingForm: boolean;
+  showNotRelevantButton: boolean;
 }) {
   const isUpdating = updatingJobId === job.id;
 
@@ -336,11 +390,7 @@ function JobRow({
             {job.company} · {job.location ?? "Location not specified"}
           </p>
 
-          {job.follow_up_date && (
-            <p className="text-sm text-yellow-300 mt-2">
-              Follow up: {job.follow_up_date}
-            </p>
-          )}
+          <JobTrackingSummary job={job} />
         </div>
 
         <a
@@ -370,14 +420,139 @@ function JobRow({
           Mark Applied
         </button>
 
-        <button
-          disabled={isUpdating}
-          onClick={handleNotRelevant}
-          className="bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-200 px-3 py-2 rounded-xl text-sm"
-        >
-          Not Relevant
-        </button>
+        {showNotRelevantButton && (
+          <button
+            disabled={isUpdating}
+            onClick={handleNotRelevant}
+            className="bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-200 px-3 py-2 rounded-xl text-sm"
+          >
+            Not Relevant
+          </button>
+        )}
       </div>
+
+      {showTrackingForm ? (
+        <JobTrackingForm
+          job={job}
+          isUpdating={isUpdating}
+          onApplicationUpdate={onApplicationUpdate}
+        />
+      ) : (
+        <p className="text-sm text-slate-400">
+          This job is archived as Not Interested. Use Save or Mark Applied to
+          move it back into your active workflow.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function JobTrackingSummary({ job }: { job: Job }) {
+  const hasTrackingDetails =
+    job.applied_at || job.follow_up_date || job.resume_version || job.notes;
+
+  if (!hasTrackingDetails) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300 space-y-1">
+      {job.applied_at && <p>Applied on: {job.applied_at.slice(0, 10)}</p>}
+      {job.follow_up_date && <p>Follow up: {job.follow_up_date}</p>}
+      {job.resume_version && <p>Resume: {job.resume_version}</p>}
+      {job.notes && <p>Notes: {job.notes}</p>}
+    </div>
+  );
+}
+
+function JobTrackingForm({
+  job,
+  isUpdating,
+  onApplicationUpdate,
+}: {
+  job: Job;
+  isUpdating: boolean;
+  onApplicationUpdate: (jobId: number, data: ApplicationUpdateInput) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState(job.follow_up_date ?? "");
+  const [resumeVersion, setResumeVersion] = useState(job.resume_version ?? "");
+  const [notes, setNotes] = useState(job.notes ?? "");
+
+  useEffect(() => {
+    setFollowUpDate(job.follow_up_date ?? "");
+    setResumeVersion(job.resume_version ?? "");
+    setNotes(job.notes ?? "");
+  }, [job.id, job.follow_up_date, job.resume_version, job.notes]);
+
+  function handleSaveTracking() {
+    onApplicationUpdate(job.id, {
+      follow_up_date: followUpDate || null,
+      resume_version: resumeVersion.trim() || null,
+      notes: notes.trim() || null,
+    });
+
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/40">
+      <button
+        onClick={() => setIsOpen((current) => !current)}
+        className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/60 rounded-xl"
+      >
+        {isOpen ? "Hide tracking details" : "Add / edit tracking details"}
+      </button>
+
+      {isOpen && (
+        <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">
+              Follow-up date
+            </label>
+            <input
+              type="date"
+              value={followUpDate}
+              onChange={(event) => setFollowUpDate(event.target.value)}
+              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">
+              Resume version
+            </label>
+            <input
+              type="text"
+              value={resumeVersion}
+              onChange={(event) => setResumeVersion(event.target.value)}
+              placeholder="Example: Resume v1 backend"
+              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs text-slate-400 mb-1">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Example: Applied through careers page. Need to message recruiter on LinkedIn."
+              rows={3}
+              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <button
+              disabled={isUpdating}
+              onClick={handleSaveTracking}
+              className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm"
+            >
+              Save Tracking Details
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
