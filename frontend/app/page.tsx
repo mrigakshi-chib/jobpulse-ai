@@ -499,6 +499,14 @@ function JobRow({
   showNotRelevantButton: boolean;
 }) {
   const isUpdating = updatingJobId === job.id;
+  const [showAppliedPrompt, setShowAppliedPrompt] = useState(false);
+
+  function handleApplyClick() {
+    const applyUrl = job.apply_url || job.job_url;
+
+    window.open(applyUrl, "_blank", "noopener,noreferrer");
+    setShowAppliedPrompt(true);
+  }
 
   function handleNotRelevant() {
     const confirmed = window.confirm(
@@ -534,15 +542,43 @@ function JobRow({
           <JobTrackingSummary job={job} />
         </div>
 
-        <a
-          href={job.apply_url || job.job_url}
-          target="_blank"
-          rel="noreferrer"
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-center"
+        <button
+          disabled={isUpdating}
+          onClick={handleApplyClick}
+          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-semibold px-4 py-2 rounded-xl text-center"
         >
           Apply
-        </a>
+        </button>
       </div>
+
+      {showAppliedPrompt && job.status !== "applied" && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <p className="text-sm text-emerald-100 mb-3">
+            Did you complete the application for this job?
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled={isUpdating}
+              onClick={() => {
+                onStatusChange(job.id, "applied");
+                setShowAppliedPrompt(false);
+              }}
+              className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-semibold px-3 py-2 rounded-xl text-sm"
+            >
+              Yes, mark applied
+            </button>
+
+            <button
+              disabled={isUpdating}
+              onClick={() => setShowAppliedPrompt(false)}
+              className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 px-3 py-2 rounded-xl text-sm"
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button
