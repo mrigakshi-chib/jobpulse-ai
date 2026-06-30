@@ -379,12 +379,9 @@ export default function Home() {
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <StatCard label="Total jobs" value={stats.total_jobs} />
-            <StatCard label="High-score jobs" value={stats.high_score_jobs} />
-            <StatCard label="Follow-ups due" value={stats.follow_ups_due} />
-            <StatCard
-              label="Applied"
-              value={stats.status_counts.applied ?? 0}
-            />
+            <StatCard label="Active matches" value={allNewJobs.length} />
+            <StatCard label="Saved" value={savedJobs.length} />
+            <StatCard label="Applied" value={appliedJobs.length} />
           </div>
         )}
 
