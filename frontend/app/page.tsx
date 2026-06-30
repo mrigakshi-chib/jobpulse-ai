@@ -26,12 +26,33 @@ type Job = {
   resume_version?: string | null;
 };
 
-type TabKey = "priority" | "saved" | "applied" | "internships" | "not_interested";
+type TabKey =
+  | "priority"
+  | "saved"
+  | "applied"
+  | "internships"
+  | "not_interested";
 
 type ApplicationUpdateInput = {
   follow_up_date: string | null;
   resume_version: string | null;
   notes: string | null;
+};
+
+type ScrapeRunResult = {
+  message?: string;
+  total_fetched?: number;
+  inserted?: number;
+  inserted_jobs?: number;
+  duplicates?: number;
+  skipped_duplicates?: number;
+  result?: {
+    total_fetched?: number;
+    inserted?: number;
+    inserted_jobs?: number;
+    duplicates?: number;
+    skipped_duplicates?: number;
+  };
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -53,14 +74,19 @@ const NOT_INTERESTED_JOBS_URL = `${API_URL}/jobs/?status=not_relevant`;
 
 export default function Home() {
   const [stats, setStats] = useState<JobStats | null>(null);
+
   const [priorityJobs, setPriorityJobs] = useState<Job[]>([]);
   const [internshipJobs, setInternshipJobs] = useState<Job[]>([]);
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
   const [notInterestedJobs, setNotInterestedJobs] = useState<Job[]>([]);
+
   const [activeTab, setActiveTab] = useState<TabKey>("priority");
   const [loading, setLoading] = useState(true);
   const [updatingJobId, setUpdatingJobId] = useState<number | null>(null);
+
+  const [scrapeRunning, setScrapeRunning] = useState(false);
+  const [scrapeMessage, setScrapeMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
     try {
@@ -157,6 +183,44 @@ export default function Home() {
     }
   }
 
+  async function runFreshJobsSearch() {
+    try {
+      setScrapeRunning(true);
+      setScrapeMessage("Searching for fresh jobs...");
+
+      const response = await fetch(`${API_URL}/scheduler/run-now`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to run scraper");
+      }
+
+      const data: ScrapeRunResult = await response.json();
+
+      const inserted =
+        data.inserted ??
+        data.inserted_jobs ??
+        data.result?.inserted ??
+        data.result?.inserted_jobs;
+
+      const fetched = data.total_fetched ?? data.result?.total_fetched;
+
+      await loadDashboard();
+
+      setScrapeMessage(
+        `Fresh search complete. Fetched ${
+          fetched ?? "some"
+        } jobs and inserted ${inserted ?? "some"} new matches.`
+      );
+    } catch (error) {
+      console.error("Failed to run fresh jobs search", error);
+      setScrapeMessage("Could not run fresh jobs search. Please try again.");
+    } finally {
+      setScrapeRunning(false);
+    }
+  }
+
   const tabs = useMemo(
     () => [
       {
@@ -224,15 +288,29 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-8">
-          <p className="text-sm text-emerald-400 font-medium">JobPulse AI</p>
-          <h1 className="text-3xl font-bold mt-2">
-            Fresher Job Discovery Dashboard
-          </h1>
-          <p className="text-slate-400 mt-2">
-            Track fresher-friendly software roles, internships, applications,
-            and follow-ups.
-          </p>
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm text-emerald-400 font-medium">JobPulse AI</p>
+            <h1 className="text-3xl font-bold mt-2">
+              Fresher Job Discovery Dashboard
+            </h1>
+            <p className="text-slate-400 mt-2">
+              Track fresher-friendly software roles, internships, applications,
+              and follow-ups.
+            </p>
+
+            {scrapeMessage && (
+              <p className="text-sm text-slate-300 mt-3">{scrapeMessage}</p>
+            )}
+          </div>
+
+          <button
+            onClick={runFreshJobsSearch}
+            disabled={scrapeRunning}
+            className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-semibold px-5 py-3 rounded-xl"
+          >
+            {scrapeRunning ? "Searching..." : "Find Fresh Jobs Now"}
+          </button>
         </div>
 
         {stats && (
