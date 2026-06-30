@@ -272,37 +272,52 @@ def get_jobs(
 
     if exclude_non_target_roles:
         query = query.filter(
-        ~or_(
-            Job.title.ilike("%senior%"),
-            Job.title.ilike("%sr.%"),
-            Job.title.ilike("%lead%"),
-            Job.title.ilike("%staff%"),
-            Job.title.ilike("%principal%"),
-            Job.title.ilike("%architect%"),
-            Job.title.ilike("%manager%"),
-            Job.title.ilike("%director%"),
-            Job.title.ilike("%head%"),
-            Job.title.ilike("%release%"),
-            Job.title.ilike("%devops%"),
-            Job.title.ilike("%site reliability%"),
-            Job.title.ilike("%sre%"),
-            Job.title.ilike("%embedded%"),
-            Job.title.ilike("%firmware%"),
-            Job.title.ilike("%hardware%"),
-            Job.title.ilike("%validation%"),
-            Job.title.ilike("%support%"),
-            Job.title.ilike("%consultant%"),
-            Job.title.ilike("%business analyst%"),
-            Job.title.ilike("%data analyst%"),
-            Job.title.ilike("%data engineer%"),
-            Job.title.ilike("%customer success%"),
-            Job.title.ilike("%customer support%"),
-            Job.title.ilike("%technical support%"),
-            Job.title.ilike("%sales%"),
-            Job.title.ilike("%marketing%"),
-        )
-    )
+            ~or_(
+                # Senior / non-entry roles
+                Job.title.ilike("%senior%"),
+                Job.title.ilike("%sr.%"),
+                Job.title.ilike("%lead%"),
+                Job.title.ilike("%staff%"),
+                Job.title.ilike("%principal%"),
+                Job.title.ilike("%architect%"),
+                Job.title.ilike("%manager%"),
+                Job.title.ilike("%director%"),
+                Job.title.ilike("%head%"),
 
+                # Non-target tech roles
+                Job.title.ilike("%release%"),
+                Job.title.ilike("%devops%"),
+                Job.title.ilike("%site reliability%"),
+                Job.title.ilike("%sre%"),
+                Job.title.ilike("%embedded%"),
+                Job.title.ilike("%firmware%"),
+                Job.title.ilike("%hardware%"),
+                Job.title.ilike("%validation%"),
+                Job.title.ilike("%support%"),
+                Job.title.ilike("%consultant%"),
+                Job.title.ilike("%business analyst%"),
+                Job.title.ilike("%data analyst%"),
+                Job.title.ilike("%data engineer%"),
+                Job.title.ilike("%customer success%"),
+                Job.title.ilike("%customer support%"),
+                Job.title.ilike("%technical support%"),
+                Job.title.ilike("%sales%"),
+                Job.title.ilike("%marketing%"),
+
+                # Spammy / low-quality company signals
+                Job.company.ilike("%retail hiring%"),
+                Job.company.ilike("%jewellery%"),
+                Job.company.ilike("%jewelry%"),
+                Job.company.ilike("%hiring%"),
+                Job.company.ilike("%recruitment%"),
+                Job.company.ilike("%staffing%"),
+                Job.company.ilike("%placement%"),
+                Job.company.ilike("%consultancy%"),
+                Job.company.ilike("%consultants%"),
+                Job.company.ilike("%manpower%"),
+                Job.company.ilike("%hr services%"),
+            )
+        )
     if has_follow_up is True:
         query = query.filter(Job.follow_up_date.isnot(None))
 
