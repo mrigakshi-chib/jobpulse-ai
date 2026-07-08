@@ -71,9 +71,11 @@ GOOD_TITLE_KEYWORDS = [
     "software engineer i",
     "software developer i",
     "sde i",
+    "sde-i",
     "sde 1",
     "sde-1",
     "sde1",
+    "software development engineer",
 
     # General target software roles
     "software engineer",
@@ -108,6 +110,7 @@ GOOD_TITLE_KEYWORDS = [
     "trainee software engineer",
     "software developer trainee",
     "engineering intern",
+    "engineer intern",
     "software engineer intern",
     "software developer intern",
     "backend developer intern",
@@ -118,8 +121,6 @@ GOOD_TITLE_KEYWORDS = [
     # Some company pages use this title
     "member of technical staff",
 ]
-
-
 def is_good_company_job(job: dict) -> bool:
     title = (job.get("title") or "").lower()
     company = (job.get("company") or "").lower()

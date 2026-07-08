@@ -1,5 +1,5 @@
 COMPANY_SOURCES = [
-    # Existing sources
+    # Existing useful Lever sources
     {
         "company": "Veeva Systems",
         "ats": "lever",
@@ -37,7 +37,7 @@ COMPANY_SOURCES = [
         "enabled": True,
     },
 
-    # New fresher/internship-friendly sources
+    # Already added fresher/internship-friendly sources
     {
         "company": "Drivetrain",
         "ats": "lever",
@@ -60,6 +60,64 @@ COMPANY_SOURCES = [
         "company": "ShopBack",
         "ats": "lever",
         "token": "shopback-2",
+        "enabled": True,
+    },
+
+    # Batch 2 sources
+    {
+        "company": "Hevo Data",
+        "ats": "lever",
+        "token": "hevodata",
+        "enabled": True,
+    },
+    {
+        "company": "Smarsh",
+        "ats": "lever",
+        "token": "smarsh",
+        "enabled": True,
+    },
+    {
+        "company": "Weekday",
+        "ats": "lever",
+        "token": "weekdayworks",
+        "enabled": True,
+    },
+    {
+        "company": "Level AI",
+        "ats": "lever",
+        "token": "levelai",
+        "enabled": True,
+    },
+    {
+        "company": "Nium",
+        "ats": "lever",
+        "token": "nium",
+        "enabled": True,
+    },
+    {
+        "company": "Zimperium",
+        "ats": "lever",
+        "token": "zimperium",
+        "enabled": True,
+    },
+    {
+        "company": "Kobie",
+        "ats": "lever",
+        "token": "kobie",
+        "enabled": True,
+    },
+
+    # Greenhouse sources
+    {
+        "company": "HubSpot",
+        "ats": "greenhouse",
+        "token": "hubspotjobs",
+        "enabled": True,
+    },
+    {
+        "company": "DigiCert",
+        "ats": "greenhouse",
+        "token": "digicert",
         "enabled": True,
     },
 ]
