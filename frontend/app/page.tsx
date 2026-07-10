@@ -488,22 +488,52 @@ function ScrapeSummaryPanel({
   summary: LastScrapeSummary;
 }) {
   const companySourceRows = [...summary.companySourceSummaries]
+    .map((source) => {
+      const existing =
+        source.skipped_duplicates ?? 0;
+
+      const nonTarget =
+        source.skipped_non_target_role ??
+        source.skipped_not_fresher_friendly ??
+        0;
+
+      const lowScore =
+        source.skipped_low_score ?? 0;
+
+      const usefulHits = source.inserted + existing;
+
+      return {
+        ...source,
+        existing,
+        nonTarget,
+        lowScore,
+        usefulHits,
+      };
+    })
     .sort((a, b) => {
+      if (b.usefulHits !== a.usefulHits) {
+        return b.usefulHits - a.usefulHits;
+      }
+
       if (b.inserted !== a.inserted) {
         return b.inserted - a.inserted;
       }
 
+      if (b.existing !== a.existing) {
+        return b.existing - a.existing;
+      }
+
       return b.fetched - a.fetched;
     })
-    .slice(0, 12);
+    .slice(0, 15);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-8">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Last scrape summary</h2>
         <p className="text-sm text-slate-400 mt-1">
-          This helps you understand whether jobs were found, inserted, skipped
-          as duplicates, or rejected by filters.
+          This helps you understand whether jobs were found, inserted, already
+          existing, skipped as non-target, or rejected by filters.
         </p>
       </div>
 
@@ -519,7 +549,7 @@ function ScrapeSummaryPanel({
               value={summary.jobspySkippedLowQuality}
             />
             <SummaryItem
-              label="Duplicates"
+              label="Existing"
               value={summary.jobspySkippedDuplicates}
             />
             <SummaryItem
@@ -540,7 +570,7 @@ function ScrapeSummaryPanel({
               value={summary.companySkippedNonTarget}
             />
             <SummaryItem
-              label="Duplicates"
+              label="Existing"
               value={summary.companySkippedDuplicates}
             />
             <SummaryItem
@@ -556,8 +586,8 @@ function ScrapeSummaryPanel({
           <div className="mb-3">
             <h3 className="font-semibold">Company source breakdown</h3>
             <p className="text-sm text-slate-400 mt-1">
-              Sources with inserted jobs appear first. This helps decide which
-              companies are useful and which ones are noisy.
+              Sources are sorted by useful hits first. Useful hits means newly
+              inserted jobs plus jobs that already existed in your database.
             </p>
           </div>
 
@@ -569,8 +599,9 @@ function ScrapeSummaryPanel({
                   <th className="py-2 pr-4">ATS</th>
                   <th className="py-2 pr-4">Fetched</th>
                   <th className="py-2 pr-4">Inserted</th>
+                  <th className="py-2 pr-4">Existing</th>
+                  <th className="py-2 pr-4">Useful hits</th>
                   <th className="py-2 pr-4">Non-target</th>
-                  <th className="py-2 pr-4">Duplicates</th>
                   <th className="py-2 pr-4">Low score</th>
                 </tr>
               </thead>
@@ -584,23 +615,33 @@ function ScrapeSummaryPanel({
                     <td className="py-2 pr-4 text-slate-100">
                       {source.company}
                     </td>
+
                     <td className="py-2 pr-4 text-slate-300">
                       {source.ats}
                     </td>
-                    <td className="py-2 pr-4">{source.fetched}</td>
+
+                    <td className="py-2 pr-4">
+                      {source.fetched}
+                    </td>
+
                     <td className="py-2 pr-4 text-emerald-300 font-semibold">
                       {source.inserted}
                     </td>
-                    <td className="py-2 pr-4">
-                      {source.skipped_non_target_role ??
-                        source.skipped_not_fresher_friendly ??
-                        0}
+
+                    <td className="py-2 pr-4 text-blue-300 font-semibold">
+                      {source.existing}
                     </td>
-                    <td className="py-2 pr-4">
-                      {source.skipped_duplicates ?? 0}
+
+                    <td className="py-2 pr-4 text-yellow-300 font-semibold">
+                      {source.usefulHits}
                     </td>
+
                     <td className="py-2 pr-4">
-                      {source.skipped_low_score ?? 0}
+                      {source.nonTarget}
+                    </td>
+
+                    <td className="py-2 pr-4">
+                      {source.lowScore}
                     </td>
                   </tr>
                 ))}
