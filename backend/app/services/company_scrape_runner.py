@@ -5,6 +5,7 @@ from app.data.company_sources import COMPANY_SOURCES
 from app.models.job import Job
 from app.scrapers.greenhouse_adapter import fetch_greenhouse_jobs
 from app.scrapers.lever_adapter import fetch_lever_jobs
+from app.scrapers.ashby_adapter import fetch_ashby_jobs
 from app.services.dedupe import calculate_job_fingerprint
 from app.services.scoring import calculate_job_score
 
@@ -76,6 +77,11 @@ GOOD_TITLE_KEYWORDS = [
     "sde-1",
     "sde1",
     "software development engineer",
+    "ai software engineer intern",
+    "software engineer intern",
+    "engineering intern",
+    "engineer intern",
+    "ai engineer intern",
 
     # General target software roles
     "software engineer",
@@ -264,6 +270,11 @@ def run_company_scrape(
             )
         elif ats == "lever":
             fetched_jobs = fetch_lever_jobs(
+                company_name=company,
+                company_token=token,
+            )
+        elif ats == "ashby":
+            fetched_jobs = fetch_ashby_jobs(
                 company_name=company,
                 company_token=token,
             )

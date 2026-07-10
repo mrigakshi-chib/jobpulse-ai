@@ -120,4 +120,10 @@ COMPANY_SOURCES = [
         "token": "digicert",
         "enabled": True,
     },
+        {
+        "company": "Outmarket AI",
+        "ats": "ashby",
+        "token": "outmarket",
+        "enabled": True,
+    },
 ]
