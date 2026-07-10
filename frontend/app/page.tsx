@@ -61,6 +61,19 @@ type ScrapeRunResult = {
   };
 };
 
+type LastScrapeSummary = {
+  jobspyFetched: number;
+  jobspyInserted: number;
+  jobspySkippedLowQuality: number;
+  jobspySkippedDuplicates: number;
+  jobspySkippedLowScore: number;
+  companyFetched: number;
+  companyInserted: number;
+  companySkippedNonTarget: number;
+  companySkippedDuplicates: number;
+  companySkippedLowScore: number;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const TARGET_LOCATIONS =
@@ -105,6 +118,9 @@ export default function Home() {
 
   const [scrapeRunning, setScrapeRunning] = useState(false);
   const [scrapeMessage, setScrapeMessage] = useState<string | null>(null);
+
+  const [lastScrapeSummary, setLastScrapeSummary] =
+  useState<LastScrapeSummary | null>(null);
 
   async function loadDashboard() {
     try {
@@ -206,66 +222,83 @@ export default function Home() {
   }
 
   async function runFreshJobsSearch() {
-    try {
-      setScrapeRunning(true);
-      setScrapeMessage("Searching JobSpy and company career pages...");
+  try {
+    setScrapeRunning(true);
+    setScrapeMessage("Searching JobSpy and company career pages...");
 
-      const [jobspyResponse, companyResponse] = await Promise.all([
-        fetch(`${API_URL}/scheduler/run-now`, {
-          method: "POST",
-        }),
-        fetch(`${API_URL}/scrape/companies/?min_score=60`, {
-          method: "POST",
-        }),
-      ]);
+    const [jobspyResponse, companyResponse] = await Promise.all([
+      fetch(`${API_URL}/scheduler/run-now`, {
+        method: "POST",
+      }),
+      fetch(`${API_URL}/scrape/companies/?min_score=60`, {
+        method: "POST",
+      }),
+    ]);
 
-      if (!jobspyResponse.ok) {
-        throw new Error("Failed to run JobSpy scraper");
-      }
-
-      if (!companyResponse.ok) {
-        throw new Error("Failed to run company career-page scraper");
-      }
-
-      const jobspyData: ScrapeRunResult = await jobspyResponse.json();
-      const companyData: ScrapeRunResult = await companyResponse.json();
-
-      const jobspyFetched =
-        jobspyData.total_fetched ?? jobspyData.result?.total_fetched ?? 0;
-
-      const jobspyInserted =
-        jobspyData.inserted ??
-        jobspyData.total_inserted ??
-        jobspyData.inserted_jobs ??
-        jobspyData.result?.inserted ??
-        jobspyData.result?.total_inserted ??
-        jobspyData.result?.inserted_jobs ??
-        0;
-
-      const companyFetched =
-        companyData.total_fetched ?? companyData.result?.total_fetched ?? 0;
-
-      const companyInserted =
-        companyData.inserted ??
-        companyData.total_inserted ??
-        companyData.inserted_jobs ??
-        companyData.result?.inserted ??
-        companyData.result?.total_inserted ??
-        companyData.result?.inserted_jobs ??
-        0;
-
-      await loadDashboard();
-
-      setScrapeMessage(
-        `Fresh search complete. JobSpy fetched ${jobspyFetched} jobs and inserted ${jobspyInserted}. Company pages fetched ${companyFetched} jobs and inserted ${companyInserted}.`
-      );
-    } catch (error) {
-      console.error("Failed to run fresh jobs search", error);
-      setScrapeMessage("Could not run fresh jobs search. Please try again.");
-    } finally {
-      setScrapeRunning(false);
+    if (!jobspyResponse.ok) {
+      throw new Error("Failed to run JobSpy scraper");
     }
+
+    if (!companyResponse.ok) {
+      throw new Error("Failed to run company career-page scraper");
+    }
+
+    const jobspyData = await jobspyResponse.json();
+    const companyData = await companyResponse.json();
+
+    const jobspyFetched = jobspyData.total_fetched ?? 0;
+    const jobspyInserted =
+      jobspyData.inserted ?? jobspyData.total_inserted ?? 0;
+
+    const jobspySkippedLowQuality =
+      jobspyData.total_skipped_low_quality ??
+      jobspyData.skipped_low_quality ??
+      0;
+
+    const jobspySkippedDuplicates =
+      jobspyData.total_skipped_duplicates ?? 0;
+
+    const jobspySkippedLowScore =
+      jobspyData.total_skipped_low_score ?? 0;
+
+    const companyFetched = companyData.total_fetched ?? 0;
+    const companyInserted =
+      companyData.inserted ?? companyData.total_inserted ?? 0;
+
+    const companySkippedNonTarget =
+      companyData.total_skipped_non_target_role ??
+      companyData.total_skipped_not_fresher_friendly ??
+      0;
+
+    const companySkippedDuplicates =
+      companyData.total_skipped_duplicates ?? 0;
+
+    const companySkippedLowScore =
+      companyData.total_skipped_low_score ?? 0;
+
+    await loadDashboard();
+
+    setLastScrapeSummary({
+      jobspyFetched,
+      jobspyInserted,
+      jobspySkippedLowQuality,
+      jobspySkippedDuplicates,
+      jobspySkippedLowScore,
+      companyFetched,
+      companyInserted,
+      companySkippedNonTarget,
+      companySkippedDuplicates,
+      companySkippedLowScore,
+    });
+
+    setScrapeMessage("Fresh search complete. Dashboard refreshed.");
+  } catch (error) {
+    console.error("Failed to run fresh jobs search", error);
+    setScrapeMessage("Could not run fresh jobs search. Please try again.");
+  } finally {
+    setScrapeRunning(false);
   }
+}
 
   const tabs = useMemo(
     () => [
@@ -385,6 +418,10 @@ export default function Home() {
           </div>
         )}
 
+        {lastScrapeSummary && (
+          <ScrapeSummaryPanel summary={lastScrapeSummary} />
+)}
+
         <div className="mb-5 flex flex-wrap gap-2">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
@@ -427,6 +464,82 @@ function StatCard({ label, value }: { label: string; value: number }) {
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
       <p className="text-sm text-slate-400">{label}</p>
       <p className="text-3xl font-bold mt-2">{value}</p>
+    </div>
+  );
+}
+function ScrapeSummaryPanel({
+  summary,
+}: {
+  summary: LastScrapeSummary;
+}) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-8">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Last scrape summary</h2>
+        <p className="text-sm text-slate-400 mt-1">
+          This helps you understand whether jobs were found, inserted, skipped
+          as duplicates, or rejected by filters.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4">
+          <h3 className="font-semibold mb-3">JobSpy</h3>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <SummaryItem label="Fetched" value={summary.jobspyFetched} />
+            <SummaryItem label="Inserted" value={summary.jobspyInserted} />
+            <SummaryItem
+              label="Low quality"
+              value={summary.jobspySkippedLowQuality}
+            />
+            <SummaryItem
+              label="Duplicates"
+              value={summary.jobspySkippedDuplicates}
+            />
+            <SummaryItem
+              label="Low score"
+              value={summary.jobspySkippedLowScore}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4">
+          <h3 className="font-semibold mb-3">Company pages</h3>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <SummaryItem label="Fetched" value={summary.companyFetched} />
+            <SummaryItem label="Inserted" value={summary.companyInserted} />
+            <SummaryItem
+              label="Non-target"
+              value={summary.companySkippedNonTarget}
+            />
+            <SummaryItem
+              label="Duplicates"
+              value={summary.companySkippedDuplicates}
+            />
+            <SummaryItem
+              label="Low score"
+              value={summary.companySkippedLowScore}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div>
+      <p className="text-slate-500">{label}</p>
+      <p className="text-xl font-semibold">{value}</p>
     </div>
   );
 }
