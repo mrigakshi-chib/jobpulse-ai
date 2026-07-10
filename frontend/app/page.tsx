@@ -51,6 +51,7 @@ type ScrapeRunResult = {
   total_skipped_low_quality?: number;
   skipped_low_quality?: number;
   enabled_sources?: number;
+  source_summaries?: CompanySourceSummary[];
   result?: {
     total_fetched?: number;
     total_inserted?: number;
@@ -59,6 +60,18 @@ type ScrapeRunResult = {
     duplicates?: number;
     skipped_duplicates?: number;
   };
+};
+
+type CompanySourceSummary = {
+  company: string;
+  ats: string;
+  token?: string;
+  fetched: number;
+  inserted: number;
+  skipped_duplicates?: number;
+  skipped_non_target_role?: number;
+  skipped_not_fresher_friendly?: number;
+  skipped_low_score?: number;
 };
 
 type LastScrapeSummary = {
@@ -72,6 +85,7 @@ type LastScrapeSummary = {
   companySkippedNonTarget: number;
   companySkippedDuplicates: number;
   companySkippedLowScore: number;
+  companySourceSummaries: CompanySourceSummary[];
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -279,17 +293,18 @@ export default function Home() {
     await loadDashboard();
 
     setLastScrapeSummary({
-      jobspyFetched,
-      jobspyInserted,
-      jobspySkippedLowQuality,
-      jobspySkippedDuplicates,
-      jobspySkippedLowScore,
-      companyFetched,
-      companyInserted,
-      companySkippedNonTarget,
-      companySkippedDuplicates,
-      companySkippedLowScore,
-    });
+  jobspyFetched,
+  jobspyInserted,
+  jobspySkippedLowQuality,
+  jobspySkippedDuplicates,
+  jobspySkippedLowScore,
+  companyFetched,
+  companyInserted,
+  companySkippedNonTarget,
+  companySkippedDuplicates,
+  companySkippedLowScore,
+  companySourceSummaries: companyData.source_summaries ?? [],
+});
 
     setScrapeMessage("Fresh search complete. Dashboard refreshed.");
   } catch (error) {
@@ -472,6 +487,16 @@ function ScrapeSummaryPanel({
 }: {
   summary: LastScrapeSummary;
 }) {
+  const companySourceRows = [...summary.companySourceSummaries]
+    .sort((a, b) => {
+      if (b.inserted !== a.inserted) {
+        return b.inserted - a.inserted;
+      }
+
+      return b.fetched - a.fetched;
+    })
+    .slice(0, 12);
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-8">
       <div className="mb-4">
@@ -525,6 +550,65 @@ function ScrapeSummaryPanel({
           </div>
         </div>
       </div>
+
+      {companySourceRows.length > 0 && (
+        <div className="mt-5 rounded-xl bg-slate-950/60 border border-slate-800 p-4">
+          <div className="mb-3">
+            <h3 className="font-semibold">Company source breakdown</h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Sources with inserted jobs appear first. This helps decide which
+              companies are useful and which ones are noisy.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400 border-b border-slate-800">
+                  <th className="py-2 pr-4">Company</th>
+                  <th className="py-2 pr-4">ATS</th>
+                  <th className="py-2 pr-4">Fetched</th>
+                  <th className="py-2 pr-4">Inserted</th>
+                  <th className="py-2 pr-4">Non-target</th>
+                  <th className="py-2 pr-4">Duplicates</th>
+                  <th className="py-2 pr-4">Low score</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {companySourceRows.map((source) => (
+                  <tr
+                    key={`${source.company}-${source.ats}-${source.token ?? ""}`}
+                    className="border-b border-slate-800/70 last:border-0"
+                  >
+                    <td className="py-2 pr-4 text-slate-100">
+                      {source.company}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-300">
+                      {source.ats}
+                    </td>
+                    <td className="py-2 pr-4">{source.fetched}</td>
+                    <td className="py-2 pr-4 text-emerald-300 font-semibold">
+                      {source.inserted}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {source.skipped_non_target_role ??
+                        source.skipped_not_fresher_friendly ??
+                        0}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {source.skipped_duplicates ?? 0}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {source.skipped_low_score ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
