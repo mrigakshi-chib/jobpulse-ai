@@ -4,7 +4,7 @@ COMPANY_SOURCES = [
         "company": "Veeva Systems",
         "ats": "lever",
         "token": "veeva",
-        "enabled": True,
+        "enabled": False,
     },
     {
         "company": "Acceldata",
@@ -22,7 +22,7 @@ COMPANY_SOURCES = [
         "company": "HighLevel",
         "ats": "lever",
         "token": "gohighlevel",
-        "enabled": True,
+        "enabled": False,
     },
     {
         "company": "JioStar",
@@ -34,7 +34,7 @@ COMPANY_SOURCES = [
         "company": "Coupa",
         "ats": "lever",
         "token": "coupa",
-        "enabled": True,
+        "enabled": False,
     },
 
     # Already added fresher/internship-friendly sources
@@ -112,7 +112,7 @@ COMPANY_SOURCES = [
         "company": "HubSpot",
         "ats": "greenhouse",
         "token": "hubspotjobs",
-        "enabled": True,
+        "enabled": False,
     },
     {
         "company": "DigiCert",
